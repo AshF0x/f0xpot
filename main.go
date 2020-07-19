@@ -54,7 +54,7 @@ func ConnectionHandler(ctx ssh.Context, pass string) bool {
 		//now do real logging now :^)
 		log.Println(err)
 	}
-	log.Printf("%s - %s: '%s' - %s", ctx.RemoteAddr(), ctx.User(), pass, data.Country)
+	log.Printf("%s - '%s':'%s' - %s", ctx.RemoteAddr(), ctx.User(), pass, data.Country)
 	return false
 }
 
