@@ -1,7 +1,16 @@
-# F0xpot
+# F0xpot 🦊🍯
 
 A honeypot learning project.
-Boilerplate Code and much more credit for his help goes to Tittimus.
 
+## Running
+
+```bash
+go run main.go
+```
 ## Current Project
-- Adding a flag to send logging data to influxDB
+- [x] Improving logging
+- [ ] Ingest logs into influxDB for visulization
+- [ ] Stop unnecessary external look ups for geo data
+
+## Contributors
+- [MilkBoy](https://github.com/sam-lane)

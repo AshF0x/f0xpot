@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/csv"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -17,19 +18,7 @@ const (
 	sshPort = ":22" //might want to change this as your real SSH daemon is using this port
 )
 
-func main() {
-
-	listenErr := ssh.ListenAndServe(sshPort, nil, ssh.PasswordAuth(ConnectionHandler)) //On connection call COnnectionHandler
-	if listenErr != nil {
-		//handle failures
-		log.Println("failed to start ssh server")
-		log.Fatalln(listenErr.Error())
-		os.Exit(1)
-	}
-
-}
-
-type GeoIP struct {
+type geoIP struct {
 	Query       string  `json:"query"`
 	Status      string  `json:"status"`
 	Country     string  `json:"country"`
@@ -47,22 +36,37 @@ type GeoIP struct {
 	Message     string  `json:"message"`
 }
 
+func main() {
+
+	listenErr := ssh.ListenAndServe(sshPort, nil, ssh.PasswordAuth(ConnectionHandler)) //On connection call COnnectionHandler
+	if listenErr != nil {
+		//handle failures
+		log.Println("failed to start ssh server")
+		log.Fatalln(listenErr.Error())
+		os.Exit(1)
+	}
+
+}
+
 //ConnectionHandler when an attack connects print their detaails to stdout and close the connection.
 func ConnectionHandler(ctx ssh.Context, pass string) bool {
-	data, err := RequestLocation(ctx.RemoteAddr().String()[:strings.IndexByte(ctx.RemoteAddr().String(), ':')]) //strip off the port number at end of ip ip:125120 -> ip
+	//strip off the port number at end of ip ip:125120 -> ip
+	ip := ctx.RemoteAddr().String()[:strings.IndexByte(ctx.RemoteAddr().String(), ':')]
+	data, err := requestLocation(ip)
 	if err != nil {
 		//now do real logging now :^)
 		log.Println(err)
 	}
-	log.Printf("%s - '%s':'%s' - %s", ctx.RemoteAddr(), ctx.User(), pass, data.Country)
+	log.Printf("%s - %s:%s - %s", ip, ctx.User(), pass, data.Country)
+	logToCSV(ip, ctx.User(), pass, data.Country, data.City)
 	return false
 }
 
 // RequestLocation returns information on an IP address data from IP-API.com
-func RequestLocation(ipAddress string) (gipresult GeoIP, err error) {
-	api := "http://ip-api.com/json/"
+func requestLocation(ipAddress string) (gipresult geoIP, err error) {
+	api := "http://ip-api.com/json"
 
-	request := fmt.Sprintf("%s%s", api, ipAddress)
+	request := fmt.Sprintf("%s/%s", api, ipAddress)
 	response, err := http.Get(request)
 	if err != nil {
 		return gipresult, errors.New("Error")
@@ -77,7 +81,7 @@ func RequestLocation(ipAddress string) (gipresult GeoIP, err error) {
 		return gipresult, errors.New("failed to read response body")
 	}
 
-	var result GeoIP
+	var result geoIP
 	err = json.Unmarshal(body, &result)
 	if err != nil {
 		return gipresult, errors.New("failed to parse JSON")
@@ -88,4 +92,27 @@ func RequestLocation(ipAddress string) (gipresult GeoIP, err error) {
 	}
 
 	return result, nil
+}
+
+// add any amount of strings to be wrriten to CSV.
+// logToCSV("127.0.0.1", "username")
+// logToCSV("127.0.0.1", "username", "password")
+func logToCSV(data ...string) {
+	file, err := os.OpenFile("log.csv", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	checkError(err)
+
+	defer file.Close()
+
+	writer := csv.NewWriter(file)
+
+	err = writer.Write(data)
+	checkError(err)
+
+	writer.Flush()
+}
+
+func checkError(err error) {
+	if err != nil {
+		panic(1)
+	}
 }
