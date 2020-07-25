@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/csv"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,7 +8,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
@@ -60,14 +58,7 @@ func ConnectionHandler(ctx ssh.Context, pass string) bool {
 		log.Println(err)
 	}
 	log.Printf("%s - %s:%s - %s", ip, ctx.User(), pass, data.Country)
-	time := strconv.FormatInt(time.Now().UnixNano(), 10)
-	logToCSV(
-		createKeyValue("IP", ip),
-		createKeyValue("Username", ctx.User()),
-		createKeyValue("Password", pass),
-		createKeyValue("Country", data.Country),
-		createKeyValue("City", data.City),
-		createKeyValue("Timestamp", time))
+	writeInflux(ip, ctx.User(), pass, data.Country, data.City) // time already handled
 	return false
 }
 
@@ -103,21 +94,23 @@ func requestLocation(ipAddress string) (gipresult geoIP, err error) {
 	return result, nil
 }
 
-// add any amount of strings to be wrriten to CSV.
-// logToCSV("127.0.0.1", "username")
-// logToCSV("127.0.0.1", "username", "password")
-func logToCSV(data ...string) {
-	file, err := os.OpenFile("log.csv", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+func writeInflux(ip string, username string, password string, country string, city string) {
+	file, err := os.OpenFile("log.influx", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	checkError(err)
 
-	defer file.Close()
+	_, err = file.WriteString(fmt.Sprintf("IP=%q,Username=%q,Password=%q,Country=%q,City=%q %d\n",
+		ip,
+		username,
+		password,
+		country,
+		city,
+		time.Now().UnixNano()))
 
-	writer := csv.NewWriter(file)
+	if err != nil {
+		log.Println(err.Error())
+	}
 
-	err = writer.Write(data)
-	checkError(err)
-
-	writer.Flush()
+	file.Close()
 }
 
 func checkError(err error) {
