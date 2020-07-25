@@ -9,7 +9,9 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gliderlabs/ssh"
 )
@@ -58,7 +60,14 @@ func ConnectionHandler(ctx ssh.Context, pass string) bool {
 		log.Println(err)
 	}
 	log.Printf("%s - %s:%s - %s", ip, ctx.User(), pass, data.Country)
-	logToCSV(ip, ctx.User(), pass, data.Country, data.City)
+	time := strconv.FormatInt(time.Now().UnixNano(), 10)
+	logToCSV(
+		createKeyValue("IP", ip),
+		createKeyValue("Username", ctx.User()),
+		createKeyValue("Password", pass),
+		createKeyValue("Country", data.Country),
+		createKeyValue("City", data.City),
+		createKeyValue("Timestamp", time))
 	return false
 }
 
@@ -115,4 +124,8 @@ func checkError(err error) {
 	if err != nil {
 		panic(1)
 	}
+}
+
+func createKeyValue(key string, value string) string {
+	return fmt.Sprintf("%s=%s", key, value)
 }
