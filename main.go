@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -15,7 +16,13 @@ import (
 )
 
 const (
-	sshPort = ":22" //might want to change this as your real SSH daemon is using this port
+	sshPort  = ":22" //might want to change this as your real SSH daemon is using this port
+	influxDB = "http://localhost:8086/"
+	database = "honeypot"
+)
+
+var (
+	auth string
 )
 
 type geoIP struct {
@@ -37,6 +44,7 @@ type geoIP struct {
 }
 
 func main() {
+	auth = fmt.Sprintf("%s:%s", os.Getenv("INFLUX_USERNAME"), os.Getenv("INFLUX_PASSWORD"))
 
 	listenErr := ssh.ListenAndServe(sshPort, nil, ssh.PasswordAuth(ConnectionHandler)) //On connection call COnnectionHandler
 	if listenErr != nil {
@@ -98,19 +106,35 @@ func writeInflux(ip string, username string, password string, country string, ci
 	file, err := os.OpenFile("log.influx", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	checkError(err)
 
-	_, err = file.WriteString(fmt.Sprintf("IP=%q,Username=%q,Password=%q,Country=%q,City=%q %d\n",
+	dataPoint := fmt.Sprintf("IP=%q,Username=%q,Password=%q,Country=%q,City=%q %d\n",
 		ip,
 		username,
 		password,
 		country,
 		city,
-		time.Now().UnixNano()))
+		time.Now().UnixNano())
+
+	_, err = file.WriteString(dataPoint)
 
 	if err != nil {
 		log.Println(err.Error())
 	}
 
 	file.Close()
+
+	// now send data to influxdb via POST request.
+	// curl -i -XPOST 'http://localhost:8086/write?db=mydb'
+	// --data-binary 'cpu_load_short,host=server01,region=us-west value=0.64 1434055562000000000'
+	url := fmt.Sprintf("%swrite?db=%s", influxDB, database)
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer([]byte(dataPoint)))
+	//req.Header.Set("Authorization:", auth) //uncomment if you need to set username password these are global
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		panic(err)
+	}
+	defer resp.Body.Close()
 }
 
 func checkError(err error) {
