@@ -44,9 +44,7 @@ type geoIP struct {
 }
 
 func main() {
-	user := "admin"
-	pass := "d0n7f0rg37th1s"
-	auth = fmt.Sprintf("%s:%s", user, pass)
+	auth = fmt.Sprintf("%s:%s", os.Getenv("INFLUX_USERNAME"), os.Getenv("INFLUX_PASSWORD"))
 	listenErr := ssh.ListenAndServe(sshPort, nil, ssh.PasswordAuth(ConnectionHandler)) //On connection call COnnectionHandler
 	if listenErr != nil {
 		//handle failures
